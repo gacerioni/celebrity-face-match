@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend - connects to your local Redis
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: celeb-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=host.docker.internal  # Connect to host machine's Redis
+      - REDIS_PORT=6379
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data:ro
+      - ./config.py:/app/config.py:ro
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: celeb-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+

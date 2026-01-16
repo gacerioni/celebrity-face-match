@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend - Production
+  # Runs on port 8080 externally, proxy through nginx
+  backend:
+    image: gacerioni/celebrity-face-match-backend:latest
+    container_name: celeb-backend-prod
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      # Redis Cloud URI (set this in your deployment)
+      # Format: redis://username:password@host:port/db
+      # Or: rediss://username:password@host:port/db (for SSL)
+      - REDIS_URI=${REDIS_URI}
+
+      # Alternative: Individual Redis settings (if not using URI)
+      # - REDIS_HOST=${REDIS_HOST:-localhost}
+      # - REDIS_PORT=${REDIS_PORT:-6379}
+      # - REDIS_DB=${REDIS_DB:-0}
+
+      # Application settings
+      - REDIS_INDEX_NAME=${REDIS_INDEX_NAME:-celeb_faces_idx}
+      - REDIS_KEY_PREFIX=${REDIS_KEY_PREFIX:-celeb}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend - Production
+  # Runs on port 3080 internally, proxy through nginx
+  frontend:
+    image: gacerioni/celebrity-face-match-frontend:latest
+    container_name: celeb-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "3080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
