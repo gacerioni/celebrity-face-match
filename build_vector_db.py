@@ -22,11 +22,14 @@ except ImportError:
 # Redis connection
 def get_redis_client():
     """Connect to Redis."""
+    redis_uri = os.getenv('REDIS_URI')
+    if redis_uri:
+        return redis.from_url(redis_uri, decode_responses=False)
     return redis.Redis(
-        host=config.REDIS_HOST,
-        port=config.REDIS_PORT,
-        db=config.REDIS_DB,
-        decode_responses=False  # We need bytes for vectors
+        host=os.getenv('REDIS_HOST', config.REDIS_HOST),
+        port=int(os.getenv('REDIS_PORT', config.REDIS_PORT)),
+        db=int(os.getenv('REDIS_DB', config.REDIS_DB)),
+        decode_responses=False
     )
 
 def load_metadata_files() -> List[Dict]:

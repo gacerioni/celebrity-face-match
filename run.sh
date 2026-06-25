@@ -1,51 +1,45 @@
 #!/bin/bash
 
-# Simple one-command startup for the modern demo
-# Assumes Redis is already running locally
+set -e
 
-echo "🎭 Starting Celebrity Face Match - Modern UI"
-echo ""
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+REDIS_PORT="${REDIS_PORT:-6379}"
 
-# Quick Redis check
-if ! redis-cli ping &> /dev/null; then
-    echo "❌ Error: Redis is not running"
-    echo "Please start your local Redis instance first"
-    exit 1
+# Ensure venv exists
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "Creating virtualenv..."
+    python3 -m venv "$SCRIPT_DIR/.venv"
+    "$SCRIPT_DIR/.venv/bin/pip" install -q -r "$SCRIPT_DIR/backend/requirements.txt"
 fi
 
-echo "✅ Redis detected"
-echo ""
-echo "Starting services..."
-echo ""
+# Redis check
+if ! redis-cli -p "$REDIS_PORT" ping &>/dev/null; then
+    echo "Error: Redis not responding on port $REDIS_PORT"
+    exit 1
+fi
+echo "Redis ok on port $REDIS_PORT"
 
-# Start backend in background
-echo "🔵 Starting backend..."
-cd backend
-pip install -q -r requirements.txt 2>/dev/null
-python main.py &
+# Backend
+echo "Starting backend..."
+cd "$SCRIPT_DIR"
+REDIS_PORT="$REDIS_PORT" "$VENV_PYTHON" backend/main.py &
 BACKEND_PID=$!
-cd ..
 
-# Wait for backend to start
 sleep 3
 
-# Start frontend
-echo "🟢 Starting frontend..."
-cd frontend
-npm install --silent 2>/dev/null
+# Frontend
+echo "Starting frontend..."
+cd "$SCRIPT_DIR/frontend"
 npm run dev &
 FRONTEND_PID=$!
-cd ..
 
 echo ""
-echo "✅ Services started!"
+echo "Demo running:"
+echo "  Frontend: http://localhost:5173"
+echo "  Backend:  http://localhost:8000"
 echo ""
-echo "📍 Access the demo at: http://localhost:3000"
-echo ""
-echo "Press Ctrl+C to stop all services"
-echo ""
+echo "Press Ctrl+C to stop"
 
-# Wait for Ctrl+C
-trap "echo ''; echo 'Stopping services...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT
 wait
-
