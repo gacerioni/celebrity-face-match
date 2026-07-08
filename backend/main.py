@@ -275,16 +275,14 @@ async def process_frame_async(websocket: WebSocket, data: Dict):
             })
             return
 
-        # Download celebrity images in parallel
-        celebrity_images = []
+        # No server-side image fetch. Each user's browser loads the celebrity
+        # photo directly from match['image_url']. Previously the VM downloaded
+        # the 5 match images per frame from Wikimedia; those blocking calls hit
+        # 429 rate limits and starved the event-loop thread pool, which froze
+        # *other* connected users. Browser-direct = zero image I/O on the box,
+        # so concurrent users no longer block each other.
         for match in matches:
-            img_data = await asyncio.to_thread(download_celebrity_image, match['image_url'])
-            celebrity_images.append(img_data)
-
-        # Calculate similarities
-        for i, match in enumerate(matches):
             match['similarity'] = (1 - match['score']) * 100
-            match['image_data'] = celebrity_images[i]
 
         total_time = time.time() - start_time
 

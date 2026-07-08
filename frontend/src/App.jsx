@@ -228,10 +228,12 @@ function App() {
                     {index + 1}
                   </span>
 
-                  {match.image_data ? (
+                  {match.image_url ? (
                     <img
-                      src={`data:image/jpeg;base64,${match.image_data}`}
+                      src={match.image_url}
                       alt={match.name}
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
                       className="w-16 h-16 rounded-xl object-cover border border-white/[0.08] flex-shrink-0"
                     />
                   ) : (

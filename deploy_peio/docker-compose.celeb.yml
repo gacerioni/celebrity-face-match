@@ -7,6 +7,9 @@ services:
 
   celeb-backend:
     image: gacerioni/celebrity-face-match-backend:latest
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
     container_name: celeb-backend
     restart: unless-stopped
     environment:
