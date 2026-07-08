@@ -20,6 +20,10 @@ services:
 
   celeb-frontend:
     image: celeb-frontend:peio
+    build:
+      context: ../frontend
+      args:
+        VITE_WS_URL: wss://celeb.platformengineer.io/ws
     container_name: celeb-frontend
     restart: unless-stopped
     depends_on:
