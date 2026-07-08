@@ -5,6 +5,11 @@ import './App.css';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 const FRAME_INTERVAL = 500;
 
+// Brand palette (matches platformengineer.io — dark + neon, no Redis red)
+const NEON_BLUE = '#38BDF8';   // active / scanning
+const NEON_GREEN = '#34D399';  // match / success
+const NEON_PURPLE = '#A78BFA'; // secondary accent
+
 function App() {
   const webcamRef = useRef(null);
   const wsRef = useRef(null);
@@ -14,6 +19,15 @@ function App() {
   const [searchTime, setSearchTime] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scanStatus, setScanStatus] = useState('idle'); // idle | scanning | match | no_face
+  const [indexed, setIndexed] = useState(null);
+
+  // Live count of indexed faces — a small flex that it is all in Redis.
+  useEffect(() => {
+    fetch('/api/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.total_celebrities === 'number') setIndexed(d.total_celebrities); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const connect = () => {
@@ -72,31 +86,47 @@ function App() {
   }, [isConnected, isProcessing]);
 
   const isMatch = scanStatus === 'match';
+  const accent = isMatch ? NEON_GREEN : NEON_BLUE;
 
   return (
-    <div className="min-h-screen bg-[#0D0F14] text-white flex flex-col">
+    <div className="min-h-screen bg-[#0B0D12] text-white flex flex-col relative overflow-hidden">
+      {/* ambient glow */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full blur-[130px] opacity-[0.10]"
+           style={{ background: `radial-gradient(circle, ${isMatch ? NEON_GREEN : NEON_BLUE}, transparent 70%)` }} />
 
-      <header className="border-b border-white/[0.06] px-6 py-3 flex items-center justify-between">
+      <header className="relative z-10 border-b border-white/[0.06] px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/redis-wordmark.svg" alt="Redis" className="h-[18px] brightness-0 invert opacity-90" />
-          <span className="text-white/15 text-xl font-thin">|</span>
-          <span className="text-sm text-white/40 font-light tracking-widest uppercase">Face Match</span>
+          <a href="https://platformengineer.io" className="flex items-center gap-2 group">
+            <span className="text-[15px] font-semibold tracking-tight bg-gradient-to-r from-[#38BDF8] via-[#34D399] to-[#A78BFA] bg-clip-text text-transparent">
+              platformengineer.io
+            </span>
+          </a>
+          <span className="text-white/15 text-lg font-thin">/</span>
+          <span className="text-sm text-white/45 font-light tracking-widest uppercase">Celebrity Face Match</span>
         </div>
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
-          isConnected
-            ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-400'
-            : 'border-white/[0.08] bg-white/[0.04] text-white/30'
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-white/20'}`} />
-          {isConnected ? 'Connected' : 'Disconnected'}
+        <div className="flex items-center gap-3">
+          {indexed !== null && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-white/40 bg-white/[0.03] border border-white/[0.08] rounded-full px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: NEON_PURPLE }} />
+              <span className="text-white/70 font-medium tabular-nums">{indexed.toLocaleString()}</span> faces indexed
+            </span>
+          )}
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+            isConnected
+              ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/30'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
+            {isConnected ? 'Live' : 'Connecting'}
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 lg:p-8 xl:p-10 2xl:p-12">
+      <main className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 lg:p-8 xl:p-10 2xl:p-12">
 
         {/* Webcam panel */}
         <div className="flex flex-col gap-3">
-          <div className="relative bg-black rounded-xl overflow-hidden aspect-video border border-white/[0.06]">
+          <div className="relative bg-black rounded-xl overflow-hidden aspect-video border border-white/[0.08]">
             <Webcam
               ref={webcamRef}
               audio={false}
@@ -107,32 +137,30 @@ function App() {
 
             {/* Overlay */}
             <div className="absolute inset-0 pointer-events-none">
-              {/* Corner brackets */}
-              <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-[#FF4438] opacity-60" />
-              <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-[#FF4438] opacity-60" />
-              <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-[#FF4438] opacity-60" />
-              <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-[#FF4438] opacity-60" />
+              {/* Corner brackets — tint to the active accent */}
+              <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 opacity-70 transition-colors" style={{ borderColor: accent }} />
+              <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 opacity-70 transition-colors" style={{ borderColor: accent }} />
+              <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 opacity-70 transition-colors" style={{ borderColor: accent }} />
+              <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 opacity-70 transition-colors" style={{ borderColor: accent }} />
 
               {/* Scan line */}
               {isProcessing && (
-                <div className="scan-line absolute left-4 right-4 h-px bg-gradient-to-r from-transparent via-[#FF4438]/50 to-transparent" />
+                <div className="scan-line absolute left-4 right-4 h-px"
+                     style={{ background: `linear-gradient(to right, transparent, ${NEON_BLUE}99, transparent)` }} />
               )}
 
               {/* Match rings */}
               {isMatch && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="match-ring w-28 h-28 rounded-full border border-[#FF4438]/60" />
-                  <div className="match-ring-outer absolute w-40 h-40 rounded-full border border-[#FF4438]/20" />
+                  <div className="match-ring w-28 h-28 rounded-full border" style={{ borderColor: `${NEON_GREEN}99` }} />
+                  <div className="match-ring-outer absolute w-40 h-40 rounded-full border" style={{ borderColor: `${NEON_GREEN}33` }} />
                 </div>
               )}
 
               {/* Status badge */}
               {(isProcessing || isMatch) && (
-                <div className={`absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest border uppercase transition-all ${
-                  isMatch
-                    ? 'bg-[#FF4438]/10 border-[#FF4438]/40 text-[#FF4438]'
-                    : 'bg-white/[0.05] border-white/10 text-white/40'
-                }`}>
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest border uppercase transition-all"
+                     style={{ background: `${accent}1a`, borderColor: `${accent}66`, color: accent }}>
                   {isMatch ? 'Match found' : 'Scanning'}
                 </div>
               )}
@@ -140,17 +168,17 @@ function App() {
           </div>
 
           {/* Status bar */}
-          <div className="bg-[#161B24] rounded-lg border border-white/[0.06] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
+          <div className="bg-[#12161F] rounded-lg border border-white/[0.06] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
             <span className="text-sm">
               {isMatch ? (
                 <>
-                  <span className="text-[#FF4438] font-medium">{matches[0]?.name}</span>
-                  <span className="text-white/25"> matched</span>
+                  <span className="font-medium" style={{ color: NEON_GREEN }}>{matches[0]?.name}</span>
+                  <span className="text-white/25"> is your closest match</span>
                 </>
               ) : isConnected ? (
-                <span className="text-white/30">Waiting for face...</span>
+                <span className="text-white/30">Look at the camera…</span>
               ) : (
-                <span className="text-white/20">Connecting...</span>
+                <span className="text-white/20">Connecting…</span>
               )}
             </span>
             {processingTime && (
@@ -158,8 +186,8 @@ function App() {
                 <span className="text-[11px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-0.5 text-white/30">
                   <span className="text-white/60">{processingTime}s</span> total
                 </span>
-                <span className="text-[11px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-0.5 text-white/30">
-                  <span className="text-white/60">{searchTime}s</span> redis
+                <span className="text-[11px] rounded px-2 py-0.5 border" style={{ background: `${NEON_PURPLE}14`, borderColor: `${NEON_PURPLE}33`, color: `${NEON_PURPLE}` }}>
+                  <span className="font-medium">{searchTime}s</span> redis
                 </span>
               </div>
             )}
@@ -167,7 +195,7 @@ function App() {
         </div>
 
         {/* Matches panel */}
-        <div className="bg-[#161B24] rounded-xl border border-white/[0.06] overflow-hidden flex flex-col">
+        <div className="bg-[#12161F] rounded-xl border border-white/[0.06] overflow-hidden flex flex-col">
           <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
             <span className="text-sm font-medium text-white/70">Top matches</span>
             {matches.length > 0 && (
@@ -190,15 +218,13 @@ function App() {
               {matches.map((match, index) => (
                 <div
                   key={index}
-                  className={`flex-1 flex items-center gap-5 px-6 border-l-2 transition-colors min-h-0 ${
-                    index === 0
-                      ? 'border-[#FF4438] bg-[#FF4438]/[0.04]'
-                      : 'border-transparent'
-                  }`}
+                  className="flex-1 flex items-center gap-5 px-6 border-l-2 transition-colors min-h-0"
+                  style={index === 0
+                    ? { borderColor: NEON_GREEN, background: `${NEON_GREEN}0a` }
+                    : { borderColor: 'transparent' }}
                 >
-                  <span className={`text-sm font-medium w-6 text-center flex-shrink-0 ${
-                    index === 0 ? 'text-[#FF4438]' : 'text-white/20'
-                  }`}>
+                  <span className="text-sm font-medium w-6 text-center flex-shrink-0"
+                        style={{ color: index === 0 ? NEON_GREEN : 'rgba(255,255,255,0.2)' }}>
                     {index + 1}
                   </span>
 
@@ -218,27 +244,20 @@ function App() {
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <p className={`text-lg font-medium truncate ${
-                      index === 0 ? 'text-white' : 'text-white/60'
-                    }`}>
+                    <p className="text-lg font-medium truncate" style={{ color: index === 0 ? '#fff' : 'rgba(255,255,255,0.6)' }}>
                       {match.name}
                     </p>
                     <p className="text-sm text-white/25 capitalize mt-0.5">{match.category}</p>
                   </div>
 
                   <div className="flex flex-col items-end gap-2 flex-shrink-0 w-24">
-                    <span className={`text-xl font-semibold ${
-                      index === 0 ? 'text-[#FF4438]' : 'text-white/40'
-                    }`}>
+                    <span className="text-xl font-semibold tabular-nums"
+                          style={{ color: index === 0 ? NEON_GREEN : 'rgba(255,255,255,0.4)' }}>
                       {match.similarity.toFixed(1)}%
                     </span>
                     <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          index === 0 ? 'bg-[#FF4438]' : 'bg-white/15'
-                        }`}
-                        style={{ width: `${match.similarity}%` }}
-                      />
+                      <div className="h-full rounded-full transition-all duration-700"
+                           style={{ width: `${match.similarity}%`, background: index === 0 ? NEON_GREEN : 'rgba(255,255,255,0.15)' }} />
                     </div>
                   </div>
                 </div>
@@ -248,15 +267,16 @@ function App() {
         </div>
       </main>
 
-      <footer className="border-t border-white/[0.06] px-6 py-3 flex items-center justify-between">
-        <div className="flex gap-5 text-[11px] text-white/20">
-          <span>dlib <span className="text-white/35">ResNet-34</span></span>
-          <span>128-dim embeddings</span>
-          <span>cosine distance</span>
+      <footer className="relative z-10 border-t border-white/[0.06] px-6 py-3 flex items-center justify-between">
+        <div className="flex gap-5 text-[11px] text-white/25">
+          <span>face embeddings <span className="text-white/45">dlib ResNet-34</span></span>
+          <span className="hidden sm:inline">128-dim embeddings</span>
+          <span className="hidden sm:inline">cosine KNN</span>
         </div>
-        <span className="text-[11px] text-white/15">Vector Search</span>
+        <span className="text-[11px] text-white/30">
+          powered by <span style={{ color: NEON_GREEN }}>Redis 8</span> vector search
+        </span>
       </footer>
-
     </div>
   );
 }

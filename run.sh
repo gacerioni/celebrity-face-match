@@ -6,6 +6,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
 REDIS_PORT="${REDIS_PORT:-6379}"
 
+# Kill any leftover processes on the ports we need
+lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+
 # Ensure venv exists
 if [ ! -f "$VENV_PYTHON" ]; then
     echo "Creating virtualenv..."

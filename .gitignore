@@ -74,3 +74,11 @@ tmp/
 temp/
 *.tmp
 
+# platformengineer.io deploy: local venv, build tarballs, editor config
+.venv/
+*.tgz
+.claude/
+
+# Derived seed artifact (rebuild via reseed_local.py; large, not source of truth)
+data/embeddings_dump.jsonl
+

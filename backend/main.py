@@ -35,7 +35,7 @@ import config
 # Global state
 redis_client = None
 image_cache = {}
-processing_queue = asyncio.Queue()
+processing_queue = None
 
 
 def get_redis_client():
@@ -64,10 +64,11 @@ def get_redis_client():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
-    global redis_client
+    global redis_client, processing_queue
 
     # Startup
     print("🚀 Starting Celebrity Face Match Backend...")
+    processing_queue = asyncio.Queue()
     redis_client = get_redis_client()
 
     # Test Redis connection
@@ -76,7 +77,7 @@ async def lifespan(app: FastAPI):
         print(f"✅ Connected to Redis successfully")
     except Exception as e:
         print(f"❌ Redis connection failed: {e}")
-    
+
     # Start background worker
     asyncio.create_task(background_worker())
     

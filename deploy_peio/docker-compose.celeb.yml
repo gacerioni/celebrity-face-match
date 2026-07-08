@@ -1,0 +1,28 @@
+services:
+  celeb-redis:
+    image: redis:8
+    container_name: celeb-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "300", "1", "--appendonly", "no"]
+
+  celeb-backend:
+    image: gacerioni/celebrity-face-match-backend:latest
+    container_name: celeb-backend
+    restart: unless-stopped
+    environment:
+      - REDIS_URI=redis://celeb-redis:6379
+      - REDIS_INDEX_NAME=celeb_faces_idx
+      - REDIS_KEY_PREFIX=celeb
+    depends_on:
+      - celeb-redis
+    ports:
+      - "127.0.0.1:8070:8000"   # loopback only; Caddy is the sole ingress
+
+  celeb-frontend:
+    image: celeb-frontend:peio
+    container_name: celeb-frontend
+    restart: unless-stopped
+    depends_on:
+      - celeb-backend
+    ports:
+      - "127.0.0.1:3090:80"     # loopback only; Caddy is the sole ingress

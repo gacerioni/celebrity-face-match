@@ -1,0 +1,20 @@
+celeb.platformengineer.io {
+	encode gzip
+
+	# Real-time face matching runs entirely over this WebSocket.
+	@ws path /ws
+	handle @ws {
+		reverse_proxy 127.0.0.1:8070
+	}
+
+	# REST endpoints (e.g. /api/stats) -> backend, path preserved.
+	@api path /api/*
+	handle @api {
+		reverse_proxy 127.0.0.1:8070
+	}
+
+	# Everything else -> the React SPA (nginx container).
+	handle {
+		reverse_proxy 127.0.0.1:3090
+	}
+}
