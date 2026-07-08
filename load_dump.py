@@ -51,8 +51,11 @@ schema = (
     TextField("slug"),
     TagField("category"),
     TextField("source"),
+    # L2 (Euclidean) is the metric dlib/face_recognition embeddings are trained
+    # for; COSINE piled distinct faces into a narrow 0.93+ band and mis-ranked
+    # ~24% of top matches.
     VectorField("embedding", "FLAT",
-                {"TYPE": "FLOAT32", "DIM": 128, "DISTANCE_METRIC": "COSINE"}),
+                {"TYPE": "FLOAT32", "DIM": 128, "DISTANCE_METRIC": "L2"}),
 )
 r.ft(IDX).create_index(
     schema, definition=IndexDefinition(prefix=[f"{PFX}:"], index_type=IndexType.HASH)
@@ -65,7 +68,10 @@ with open(DUMP) as f:
         line = line.strip()
         if not line:
             continue
-        d = json.loads(line)
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue  # tolerate a partial final line if the dump is still being written
         r.hset(f"{PFX}:{d['slug']}", mapping={
             "name": d["name"],
             "slug": d["slug"],

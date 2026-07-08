@@ -165,13 +165,26 @@ def main():
     todo = [c for c in uniq if c["slug"] not in done]
     print(f"Total {len(uniq)} celebs | {len(done)} already dumped | {len(todo)} to process", flush=True)
 
-    ok = fail = 0
+    ok = fail = recovered = 0
     for i, c in enumerate(todo, 1):
-        content = download(c["url"])
+        url = c["url"]
+        content = download(url)
         emb = embed(content) if content else None
+
+        # Recovery: if the (possibly stale/blocked) URL yields no face, try a
+        # fresh portrait straight from Wikipedia's pageimages API.
+        if emb is None:
+            fresh, src = wiki_image(c.get("title") or c["name"])
+            if fresh and fresh != url:
+                content = download(fresh)
+                e2 = embed(content) if content else None
+                if e2 is not None:
+                    emb, url, c["source"] = e2, fresh, src
+                    recovered += 1
+
         if emb is not None:
             append_dump({"slug": c["slug"], "name": c["name"], "category": c["category"],
-                         "source": c["source"], "image_url": c["url"],
+                         "source": c["source"], "image_url": url,
                          "embedding": base64.b64encode(emb.tobytes()).decode()})
             ok += 1
             tag = "OK"
@@ -182,7 +195,7 @@ def main():
             print(f"[{i}/{len(todo)}] {c['name']}: {tag}  (ok={ok} fail={fail})", flush=True)
         time.sleep(DELAY)
 
-    print(f"DONE: ok={ok} fail={fail} total_in_dump={ok + len(done)}", flush=True)
+    print(f"DONE: ok={ok} (recovered={recovered}) fail={fail} total_in_dump={ok + len(done)}", flush=True)
 
 
 if __name__ == "__main__":

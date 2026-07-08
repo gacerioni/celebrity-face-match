@@ -161,6 +161,16 @@ def search_similar_faces(query_embedding: np.ndarray, top_k: int = 5) -> List[Di
     return matches
 
 
+def l2_to_confidence(sq_distance: float, threshold: float = 0.6) -> float:
+    """Map Redis' squared-L2 KNN score to a friendly 0..1 confidence, using the
+    face_recognition convention (dlib 'same face' threshold ~0.6 Euclidean)."""
+    fd = max(0.0, sq_distance) ** 0.5  # Redis L2 returns the squared Euclidean distance
+    if fd > threshold:
+        return max(0.0, (1.0 - fd) / ((1.0 - threshold) * 2.0))
+    lv = 1.0 - (fd / (threshold * 2.0))
+    return lv + (1.0 - lv) * (((lv - 0.5) * 2.0) ** 0.2)
+
+
 def download_celebrity_image(url: str) -> Optional[str]:
     """Download celebrity image and return as base64"""
     if url in image_cache:
@@ -282,7 +292,7 @@ async def process_frame_async(websocket: WebSocket, data: Dict):
         # *other* connected users. Browser-direct = zero image I/O on the box,
         # so concurrent users no longer block each other.
         for match in matches:
-            match['similarity'] = (1 - match['score']) * 100
+            match['similarity'] = round(min(1.0, l2_to_confidence(match['score'])) * 100, 1)
 
         total_time = time.time() - start_time
 
